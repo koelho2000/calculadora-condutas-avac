@@ -1,14 +1,446 @@
-<html><head><meta charset='utf-8'><title>Relatório de Rede de Condutas</title></head><body>
-<h1>Relatório de Rede de Condutas</h1>
-<p>Caudal: 3000.00 m³/h</p>
-<p>Perda de carga total: 310.811 Pa</p>
-<table border='1' cellspacing='0' cellpadding='4'>
-<tr><th>#</th><th>Tipo</th><th>Diâmetro (m)</th><th>Velocidade (m/s)</th><th>Δp (Pa)</th></tr>
-<tr><td>1</td><td>straight</td><td>0.315</td><td>10.693</td><td>52.272</td></tr>
-<tr><td>2</td><td>elbow90</td><td>0.315</td><td>10.693</td><td>102.910</td></tr>
-<tr><td>3</td><td>reducer</td><td>0.315</td><td>10.693</td><td>86.461</td></tr>
-<tr><td>4</td><td>straight</td><td>0.250</td><td>16.977</td><td>69.169</td></tr>
-</table>
-<h2>Esquema da Rede</h2>
-<div><svg xmlns="http://www.w3.org/2000/svg" width="920.0" height="131.5"><rect x="0" y="0" width="920.0" height="131.5" fill="white" stroke="none"/><rect x="10.0" y="18.5" width="600.0" height="63.0" style="fill:none;stroke:black;stroke-width:1"/><path d="M 610.0,50.0 A 63.0,63.0 0 0 1 610.0,-13.0" style="fill:none;stroke:black;stroke-width:1"/><polygon points="610.0,-44.5 660.0,-38.0 660.0,12.0 610.0,18.5" style="fill:none;stroke:black;stroke-width:1"/><rect x="660.0" y="-38.0" width="250.0" height="50.0" style="fill:none;stroke:black;stroke-width:1"/></svg></div>
-</body></html>
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="utf-8">
+    <title>Calculadora e Simulador de Condutas AVAC</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.4;
+        }
+        h1 {
+            text-align: center;
+        }
+        section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 6px;
+            margin-top: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: 10px;
+            padding: 8px 12px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #aaa;
+            padding: 6px;
+            text-align: left;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+        .result-area {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px dashed #999;
+            border-radius: 6px;
+        }
+        #networkSvg {
+            border: 1px solid #999;
+            margin-top: 10px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Calculadora e Simulador de Condutas AVAC</h1>
+
+<section id="selectionSection">
+    <h2>1ª Opção — Seleção de Condutas</h2>
+    <p>Escolha o tipo de conduta e forneça o caudal e critério de dimensionamento para obter as dimensões e valores principais.</p>
+    <label for="shapeSelect">Tipo de conduta:</label>
+    <select id="shapeSelect">
+        <option value="circular">Circular</option>
+        <option value="rectangular">Retangular</option>
+    </select>
+    <label for="criterionSelect">Critério:</label>
+    <select id="criterionSelect">
+        <option value="vel">A partir da velocidade (m/s)</option>
+        <option value="dp">A partir da perda de carga (Pa/m)</option>
+    </select>
+    <label for="flowInput">Caudal (m³/h):</label>
+    <input type="number" id="flowInput" step="any" min="0" placeholder="ex.: 1800" />
+    <div id="velocityDiv">
+        <label for="velInput">Velocidade (m/s):</label>
+        <input type="number" id="velInput" step="any" min="0" placeholder="ex.: 5" />
+    </div>
+    <div id="dpDiv" style="display:none;">
+        <label for="dpInput">Perda de carga por metro (Pa/m):</label>
+        <input type="number" id="dpInput" step="any" min="0" placeholder="ex.: 0.9" />
+    </div>
+    <div id="aspectDiv" style="display:none;">
+        <label for="aspectInput">Rácio largura/altura (a/b):</label>
+        <input type="number" id="aspectInput" step="any" min="0" placeholder="ex.: 2" />
+    </div>
+    <button id="computeSelectBtn">Calcular</button>
+    <div id="selectResults" class="result-area"></div>
+</section>
+
+<section id="networkSection">
+    <h2>2ª Opção — Cálculo da Perda de Carga na Rede (Simulação 2D)</h2>
+    <p>Defina o caudal, dimensões iniciais e a lista de segmentos da rede (formato JSON). O resultado inclui as perdas de carga por troço e um esquema simplificado da rede.</p>
+    <label for="networkShapeSelect">Tipo de conduta:</label>
+    <select id="networkShapeSelect">
+        <option value="circular">Circular</option>
+        <option value="rectangular">Retangular</option>
+    </select>
+    <label for="networkFlowInput">Caudal (m³/h):</label>
+    <input type="number" id="networkFlowInput" step="any" min="0" placeholder="ex.: 3000" />
+    <div id="dimCircularDiv">
+        <label for="diameterInput">Diâmetro inicial (m):</label>
+        <input type="number" id="diameterInput" step="any" min="0" placeholder="ex.: 0.3" />
+    </div>
+    <div id="dimRectangularDiv" style="display:none;">
+        <label for="widthInput">Largura inicial (m):</label>
+        <input type="number" id="widthInput" step="any" min="0" placeholder="ex.: 0.5" />
+        <label for="heightInput">Altura inicial (m):</label>
+        <input type="number" id="heightInput" step="any" min="0" placeholder="ex.: 0.25" />
+    </div>
+    <label for="segmentsInput">Segmentos (JSON):</label>
+    <textarea id="segmentsInput" rows="6" placeholder='Exemplo: [{"type":"straight","L":12},{"type":"elbow90"},{"type":"reducer","D2":0.25},{"type":"straight","L":5}]'></textarea>
+    <button id="simulateNetworkBtn">Simular</button>
+    <div id="networkResults" class="result-area"></div>
+    <div id="networkSvgContainer"></div>
+</section>
+
+<script>
+// Constantes físicas (ar a 20°C)
+const RHO_AIR = 1.2;
+const MU_AIR = 1.8e-5;
+const FRICTION_FACTOR = 0.02;
+
+// Funções para o dimensionamento de condutas circulares
+function circularFromVelocity(flow, velocity) {
+    if (velocity <= 0 || flow <= 0) { return null; }
+    const q_m = flow / 3600.0;
+    const area = q_m / velocity;
+    const diameter = Math.sqrt((4.0 * area) / Math.PI);
+    const dp_per_m = FRICTION_FACTOR * (RHO_AIR * velocity * velocity) / (2.0 * diameter);
+    const Re = (RHO_AIR * velocity * diameter) / MU_AIR;
+    return { diameter, area, velocity, dp_per_m, Re };
+}
+function circularFromDp(flow, dpTarget) {
+    if (dpTarget <= 0 || flow <= 0) { return null; }
+    const q_m = flow / 3600.0;
+    const numerator = FRICTION_FACTOR * (RHO_AIR / 2.0) * (q_m * q_m);
+    const denominator = Math.pow((Math.PI / 4.0), 2) * dpTarget;
+    const d_power5 = numerator / denominator;
+    const diameter = Math.pow(d_power5, 0.2);
+    const area = Math.PI * Math.pow(diameter, 2) / 4.0;
+    const velocity = q_m / area;
+    const dp_per_m = FRICTION_FACTOR * (RHO_AIR * velocity * velocity) / (2.0 * diameter);
+    const Re = (RHO_AIR * velocity * diameter) / MU_AIR;
+    return { diameter, area, velocity, dp_per_m, Re };
+}
+
+// Funções para o dimensionamento de condutas retangulares
+function rectangularFromVelocity(flow, velocity, aspect) {
+    if (velocity <= 0 || flow <= 0 || aspect <= 0) { return null; }
+    const q_m = flow / 3600.0;
+    const area = q_m / velocity;
+    const b = Math.sqrt(area / aspect);
+    const a = area / b;
+    const sqrt_r = Math.sqrt(aspect);
+    const denom = Math.pow(sqrt_r + 1.0 / sqrt_r, 0.25);
+    const deq = 1.3 * Math.pow(area, 0.375) / denom;
+    const dp_per_m = FRICTION_FACTOR * (RHO_AIR * velocity * velocity) / (2.0 * deq);
+    const Re = (RHO_AIR * velocity * deq) / MU_AIR;
+    return { a, b, area, deq, velocity, dp_per_m, Re };
+}
+function rectangularFromDp(flow, dpTarget, aspect) {
+    if (dpTarget <= 0 || flow <= 0 || aspect <= 0) { return null; }
+    const q_m = flow / 3600.0;
+    function dpForArea(area) {
+        if (area <= 0) return Infinity;
+        const b = Math.sqrt(area / aspect);
+        const a = area / b;
+        const sqrt_r = Math.sqrt(aspect);
+        const denom = Math.pow(sqrt_r + 1.0 / sqrt_r, 0.25);
+        const deq = 1.3 * Math.pow(area, 0.375) / denom;
+        const velocity = q_m / area;
+        return FRICTION_FACTOR * (RHO_AIR * velocity * velocity) / (2.0 * deq);
+    }
+    let area_low = 1e-6;
+    let area_high = 10.0;
+    for (let i = 0; i < 50; i++) {
+        if (dpForArea(area_high) < dpTarget) break;
+        area_high *= 2.0;
+    }
+    for (let i = 0; i < 60; i++) {
+        const area_mid = 0.5 * (area_low + area_high);
+        const dp_mid = dpForArea(area_mid);
+        if (dp_mid > dpTarget) {
+            area_low = area_mid;
+        } else {
+            area_high = area_mid;
+        }
+    }
+    const area = area_high;
+    const b = Math.sqrt(area / aspect);
+    const a = area / b;
+    const sqrt_r = Math.sqrt(aspect);
+    const denom = Math.pow(sqrt_r + 1.0 / sqrt_r, 0.25);
+    const deq = 1.3 * Math.pow(area, 0.375) / denom;
+    const velocity = q_m / area;
+    const dp_per_m = FRICTION_FACTOR * (RHO_AIR * velocity * velocity) / (2.0 * deq);
+    const Re = (RHO_AIR * velocity * deq) / MU_AIR;
+    return { a, b, area, deq, velocity, dp_per_m, Re };
+}
+
+// Função para actualizar visibilidade de campos conforme escolha
+function updateSelectionFields() {
+    const shape = document.getElementById('shapeSelect').value;
+    const criterion = document.getElementById('criterionSelect').value;
+    document.getElementById('aspectDiv').style.display = shape === 'rectangular' ? 'block' : 'none';
+    if (criterion === 'vel') {
+        document.getElementById('velocityDiv').style.display = 'block';
+        document.getElementById('dpDiv').style.display = 'none';
+    } else {
+        document.getElementById('velocityDiv').style.display = 'none';
+        document.getElementById('dpDiv').style.display = 'block';
+    }
+}
+
+// Função para calcular seleção de condutas
+function calculateSelection() {
+    const shape = document.getElementById('shapeSelect').value;
+    const criterion = document.getElementById('criterionSelect').value;
+    const flow = parseFloat(document.getElementById('flowInput').value);
+    const aspect = parseFloat(document.getElementById('aspectInput').value);
+    let result;
+    if (criterion === 'vel') {
+        const velocity = parseFloat(document.getElementById('velInput').value);
+        if (shape === 'circular') {
+            result = circularFromVelocity(flow, velocity);
+        } else {
+            result = rectangularFromVelocity(flow, velocity, aspect);
+        }
+    } else {
+        const dp_per_m = parseFloat(document.getElementById('dpInput').value);
+        if (shape === 'circular') {
+            result = circularFromDp(flow, dp_per_m);
+        } else {
+            result = rectangularFromDp(flow, dp_per_m, aspect);
+        }
+    }
+    const resDiv = document.getElementById('selectResults');
+    if (!result) {
+        resDiv.innerHTML = '<p style="color:red;">Parâmetros inválidos.</p>';
+        return;
+    }
+    let html = '<h3>Resultados</h3><table><tbody>';
+    if (shape === 'circular') {
+        html += `<tr><th>Diâmetro (m)</th><td>${result.diameter.toFixed(4)}</td></tr>`;
+        html += `<tr><th>Área (m²)</th><td>${result.area.toFixed(4)}</td></tr>`;
+        html += `<tr><th>Velocidade (m/s)</th><td>${result.velocity.toFixed(3)}</td></tr>`;
+        html += `<tr><th>Perda de carga (Pa/m)</th><td>${result.dp_per_m.toFixed(3)}</td></tr>`;
+        html += `<tr><th>Número de Reynolds</th><td>${result.Re.toFixed(0)}</td></tr>`;
+    } else {
+        html += `<tr><th>Largura a (m)</th><td>${result.a.toFixed(4)}</td></tr>`;
+        html += `<tr><th>Altura b (m)</th><td>${result.b.toFixed(4)}</td></tr>`;
+        html += `<tr><th>Área (m²)</th><td>${result.area.toFixed(4)}</td></tr>`;
+        html += `<tr><th>Diâmetro equivalente (m)</th><td>${result.deq.toFixed(4)}</td></tr>`;
+        html += `<tr><th>Velocidade (m/s)</th><td>${result.velocity.toFixed(3)}</td></tr>`;
+        html += `<tr><th>Perda de carga (Pa/m)</th><td>${result.dp_per_m.toFixed(3)}</td></tr>`;
+        html += `<tr><th>Número de Reynolds</th><td>${result.Re.toFixed(0)}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    resDiv.innerHTML = html;
+}
+
+// Função para calcular área de secção transversal
+function areaFromShape(shape, diameter, width, height) {
+    if (shape === 'circular') {
+        return Math.PI * diameter * diameter / 4.0;
+    }
+    return width * height;
+}
+
+// Função para simular rede de condutas e desenhar
+function simulateNetwork() {
+    const shape = document.getElementById('networkShapeSelect').value;
+    const flow = parseFloat(document.getElementById('networkFlowInput').value);
+    const segmentsText = document.getElementById('segmentsInput').value;
+    let diameter = parseFloat(document.getElementById('diameterInput').value);
+    let width = parseFloat(document.getElementById('widthInput').value);
+    let height = parseFloat(document.getElementById('heightInput').value);
+    let segments;
+    try {
+        segments = JSON.parse(segmentsText);
+        if (!Array.isArray(segments)) throw 'Formato de segmentos inválido';
+    } catch (e) {
+        document.getElementById('networkResults').innerHTML = '<p style="color:red;">Erro ao interpretar os segmentos (JSON inválido).</p>';
+        document.getElementById('networkSvgContainer').innerHTML = '';
+        return;
+    }
+    if (flow <= 0) {
+        document.getElementById('networkResults').innerHTML = '<p style="color:red;">Caudal inválido.</p>';
+        document.getElementById('networkSvgContainer').innerHTML = '';
+        return;
+    }
+    const q_m = flow / 3600.0;
+    let total_dp = 0.0;
+    let results = [];
+    let currentDiameter = diameter;
+    let currentWidth = width;
+    let currentHeight = height;
+    let svgParts = [];
+    let x = 10.0;
+    let y = 60.0;
+    let max_x = 0;
+    let max_y = 0;
+    const widthScale = 50.0;
+    const lengthScale = 50.0;
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const segType = seg.type;
+        if (!segType) continue;
+        if (segType === 'straight') {
+            const L = parseFloat(seg.L || 0);
+            if (L <= 0) continue;
+            const area = areaFromShape(shape, currentDiameter, currentWidth, currentHeight);
+            const velocity = q_m / area;
+            let deq;
+            if (shape === 'circular') {
+                deq = currentDiameter;
+            } else {
+                const r = currentWidth / currentHeight;
+                const denom = Math.pow(Math.sqrt(r) + 1.0 / Math.sqrt(r), 0.25);
+                deq = 1.3 * Math.pow(area, 0.375) / denom;
+            }
+            const dp = FRICTION_FACTOR * (RHO_AIR * velocity * velocity) / (2.0 * deq) * L;
+            total_dp += dp;
+            results.push({ segment: i+1, type: 'reta', diameter_or_width: shape==='circular' ? currentDiameter : currentWidth, height: shape==='circular' ? null : currentHeight, velocity: velocity, dp: dp });
+            const w_px = (shape === 'circular' ? currentDiameter : currentHeight) * widthScale;
+            const l_px = L * lengthScale;
+            const h_px = w_px;
+            svgParts.push(`<rect x="${x.toFixed(1)}" y="${(y - h_px/2).toFixed(1)}" width="${l_px.toFixed(1)}" height="${h_px.toFixed(1)}" style="fill:none;stroke:black;stroke-width:1"/>`);
+            x += l_px;
+            if (x > max_x) max_x = x;
+            if (y + h_px/2 > max_y) max_y = y + h_px/2;
+        } else if (segType === 'elbow90' || segType === 'elbow45') {
+            const area = areaFromShape(shape, currentDiameter, currentWidth, currentHeight);
+            const velocity = q_m / area;
+            const zeta = segType === 'elbow90' ? 1.5 : 0.3;
+            const dp = zeta * (RHO_AIR * velocity * velocity) / 2.0;
+            total_dp += dp;
+            results.push({ segment: i+1, type: segType, diameter_or_width: shape==='circular' ? currentDiameter : currentWidth, height: shape==='circular' ? null : currentHeight, velocity: velocity, dp: dp });
+            const r_px = (shape === 'circular' ? currentDiameter : currentHeight) * widthScale;
+            let endX, endY;
+            if (segType === 'elbow90') {
+                endX = x;
+                endY = y - r_px;
+            } else {
+                endX = x + r_px / Math.sqrt(2);
+                endY = y - r_px / Math.sqrt(2);
+            }
+            svgParts.push(`<path d="M ${x.toFixed(1)},${y.toFixed(1)} A ${r_px.toFixed(1)},${r_px.toFixed(1)} 0 0 1 ${endX.toFixed(1)},${endY.toFixed(1)}" style="fill:none;stroke:black;stroke-width:1"/>`);
+            x = endX;
+            y = endY;
+            if (x > max_x) max_x = x;
+            if (Math.abs(y) > max_y) max_y = Math.abs(y);
+        } else if (segType === 'reducer') {
+            if (shape === 'circular') {
+                const newD = parseFloat(seg.D2 || 0);
+                if (newD <= 0) continue;
+                const area1 = areaFromShape('circular', currentDiameter);
+                const area2 = areaFromShape('circular', newD);
+                const v1 = q_m / area1;
+                const v2 = q_m / area2;
+                const zeta = 0.5;
+                const dp = zeta * (RHO_AIR * v2 * v2) / 2.0;
+                total_dp += dp;
+                results.push({ segment: i+1, type: 'redutor', diameter_or_width: currentDiameter, height: null, velocity: v1, dp: dp });
+                const w1_px = currentDiameter * widthScale;
+                const w2_px = newD * widthScale;
+                const l_px = 1.0 * lengthScale;
+                svgParts.push(`<polygon points="${x.toFixed(1)},${(y - w1_px/2).toFixed(1)} ${ (x + l_px).toFixed(1) },${(y - w2_px/2).toFixed(1)} ${ (x + l_px).toFixed(1) },${(y + w2_px/2).toFixed(1)} ${x.toFixed(1)},${(y + w1_px/2).toFixed(1)}" style="fill:none;stroke:black;stroke-width:1"/>`);
+                x += l_px;
+                currentDiameter = newD;
+                if (x > max_x) max_x = x;
+                if (y + Math.max(w1_px/2, w2_px/2) > max_y) max_y = y + Math.max(w1_px/2, w2_px/2);
+            } else {
+                const newW = parseFloat(seg.width2 || 0);
+                const newH = parseFloat(seg.height2 || 0);
+                if (newW <= 0 || newH <= 0) continue;
+                const area1 = areaFromShape('rectangular', null, currentWidth, currentHeight);
+                const area2 = areaFromShape('rectangular', null, newW, newH);
+                const v1 = q_m / area1;
+                const v2 = q_m / area2;
+                const zeta = 0.5;
+                const dp = zeta * (RHO_AIR * v2 * v2) / 2.0;
+                total_dp += dp;
+                results.push({ segment: i+1, type: 'redutor', diameter_or_width: currentWidth, height: currentHeight, velocity: v1, dp: dp });
+                const w1_px = currentHeight * widthScale;
+                const w2_px = newH * widthScale;
+                const l_px = 1.0 * lengthScale;
+                svgParts.push(`<polygon points="${x.toFixed(1)},${(y - w1_px/2).toFixed(1)} ${ (x + l_px).toFixed(1) },${(y - w2_px/2).toFixed(1)} ${ (x + l_px).toFixed(1) },${(y + w2_px/2).toFixed(1)} ${x.toFixed(1)},${(y + w1_px/2).toFixed(1)}" style="fill:none;stroke:black;stroke-width:1"/>`);
+                x += l_px;
+                currentWidth = newW;
+                currentHeight = newH;
+                if (x > max_x) max_x = x;
+                if (y + Math.max(w1_px/2, w2_px/2) > max_y) max_y = y + Math.max(w1_px/2, w2_px/2);
+            }
+        }
+    }
+    let resHtml = `<h3>Resultados por segmento</h3>`;
+    if (shape === 'circular') {
+        resHtml += '<table><tr><th>#</th><th>Tipo</th><th>Diâmetro (m)</th><th>Velocidade (m/s)</th><th>Δp (Pa)</th></tr>';
+        for (const r of results) {
+            resHtml += `<tr><td>${r.segment}</td><td>${r.type}</td><td>${r.diameter_or_width.toFixed(3)}</td><td>${r.velocity.toFixed(3)}</td><td>${r.dp.toFixed(3)}</td></tr>`;
+        }
+        resHtml += '</table>';
+    } else {
+        resHtml += '<table><tr><th>#</th><th>Tipo</th><th>Largura (m)</th><th>Altura (m)</th><th>Velocidade (m/s)</th><th>Δp (Pa)</th></tr>';
+        for (const r of results) {
+            resHtml += `<tr><td>${r.segment}</td><td>${r.type}</td><td>${r.diameter_or_width.toFixed(3)}</td><td>${r.height.toFixed(3)}</td><td>${r.velocity.toFixed(3)}</td><td>${r.dp.toFixed(3)}</td></tr>`;
+        }
+        resHtml += '</table>';
+    }
+    resHtml += `<p><strong>Perda de carga total:</strong> ${total_dp.toFixed(3)} Pa</p>`;
+    document.getElementById('networkResults').innerHTML = resHtml;
+    const widthSvg = max_x + 20;
+    const heightSvg = Math.max(max_y + 40, 120);
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthSvg.toFixed(1)}" height="${heightSvg.toFixed(1)}"><rect x="0" y="0" width="${widthSvg.toFixed(1)}" height="${heightSvg.toFixed(1)}" fill="white" stroke="none"/>${svgParts.join('')}</svg>`;
+    document.getElementById('networkSvgContainer').innerHTML = svgContent;
+}
+
+// Atualizar campos da primeira opção
+updateSelectionFields();
+document.getElementById('shapeSelect').addEventListener('change', updateSelectionFields);
+document.getElementById('criterionSelect').addEventListener('change', updateSelectionFields);
+document.getElementById('computeSelectBtn').addEventListener('click', calculateSelection);
+
+// Atualizar campos das dimensões na rede
+function updateDimFields() {
+    const shape = document.getElementById('networkShapeSelect').value;
+    document.getElementById('dimCircularDiv').style.display = shape === 'circular' ? 'block' : 'none';
+    document.getElementById('dimRectangularDiv').style.display = shape === 'rectangular' ? 'block' : 'none';
+}
+updateDimFields();
+document.getElementById('networkShapeSelect').addEventListener('change', updateDimFields);
+
+document.getElementById('simulateNetworkBtn').addEventListener('click', simulateNetwork);
+</script>
+
+</body>
+</html>
